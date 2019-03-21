@@ -1,19 +1,11 @@
 import pandas as pd
-import numpy as np
 import datetime
 import math
 from datetime import timedelta
 
 
-input_path = 'E:/Competition/天池/Metro/data/Metro_train/'
-output = 'E:/Competition/天池/Metro/data/Metro_train_record/'
-
-in_file_name = 'record_2019-01-01.csv'
-out_file_name = in_file_name.split('_')[0]+'_'+in_file_name.split('_')[-1]
-
-f = open(input_path+in_file_name, encoding='utf-8')
-record_01 = pd.read_csv(f)
-
+input_path = 'F:/数据集/1903地铁预测/Metro_train/'
+output = 'F:/数据集处理/1903地铁预测/train/'
 
 def startTime(df):
 
@@ -30,37 +22,44 @@ def endTime(df):
     end_time = start_time + timedelta(minutes=10)
     return end_time
 
+def trans(in_file_name):
+    out_file_name = in_file_name.split('_')[0]+'_'+in_file_name.split('_')[-1]
 
+    f = open(input_path+in_file_name, encoding='utf-8')
+    record_01 = pd.read_csv(f)
 
-record_01['startTime'] = record_01.apply(startTime, axis=1)
-record_01['endTime'] = record_01.apply(endTime, axis=1)
+    record_01['startTime'] = record_01.apply(startTime, axis=1)
+    record_01['endTime'] = record_01.apply(endTime, axis=1)
 
-# record_01['time'] = pd.to_datetime(record_01['time'])
-# record_01['weekend'] = (record_01['time'].dt.weekday >= 5).astype(int)
-# record_01['dayofweek'] = record_01['time'].dt.dayofweek
-# record_01['day'] = record_01['time'].dt.day
-# record_01['hour'] = record_01['time'].dt.hour
+    agg_fun = {
+        'lineID':['nunique','count'],
+        'deviceID':['nunique', 'count'],
+        'payType':['nunique']
+    }
 
+    df = record_01.groupby(['stationID', 'startTime', 'endTime']).agg(agg_fun).\
+        sort_values(by=['stationID', 'startTime', 'endTime'], ascending=True)
+    df.columns = ['_'.join(col).strip() for col in df.columns.values]
+    df.reset_index(inplace=True)
 
-# time,lineID,stationID,deviceID,status,userID,payType
-agg_fun = {
-    'lineID':['nunique','count'],
-    'deviceID':['nunique', 'count'],
-    'payType':['nunique']
-}
+    status_1 = record_01[record_01['status']==1]
+    status_1 = status_1[['stationID', 'startTime', 'endTime','userID']]
+    status_0 = record_01[record_01['status'] == 0]
+    status_0 = status_0[['stationID', 'startTime', 'endTime','userID']]
 
-df = record_01.groupby(['stationID', 'startTime', 'endTime']).agg(agg_fun).\
-    sort_values(by=['stationID', 'startTime', 'endTime'], ascending=True)
-df.columns = ['_'.join(col).strip() for col in df.columns.values]
-df.reset_index(inplace=True)
+    df['inNums'] = status_1.groupby(['stationID', 'startTime', 'endTime'], as_index=False).agg({'userID':'count'}).sort_values(by=['stationID', 'startTime', 'endTime'], ascending=True)['userID']
+    df['outNums'] = status_0.groupby(['stationID', 'startTime', 'endTime'], as_index=False).agg({'userID':'count'}).sort_values(by=['stationID', 'startTime', 'endTime'], ascending=True)['userID']
 
+    # df.to_csv(output+out_file_name)
+    return df
 
-status_1 = record_01[record_01['status']==1]
-status_1 = status_1[['stationID', 'startTime', 'endTime','userID']]
-status_0 = record_01[record_01['status'] == 0]
-status_0 = status_0[['stationID', 'startTime', 'endTime','userID']]
+for i in range(1,26):
+    in_file_name = 'record_2019-01-{}.csv'.format("0" + str(i) if len(str(i)) == 1 else str(i))
+    print(in_file_name)
+    if i == 1:
+        df = trans(in_file_name)
+    else:
+        df = pd.concat([df,trans(in_file_name)],axis=0)
 
-df['inNums'] = status_1.groupby(['stationID', 'startTime', 'endTime'], as_index=False).agg({'userID':'count'}).sort_values(by=['stationID', 'startTime', 'endTime'], ascending=True)['userID']
-df['outNums'] = status_0.groupby(['stationID', 'startTime', 'endTime'], as_index=False).agg({'userID':'count'}).sort_values(by=['stationID', 'startTime', 'endTime'], ascending=True)['userID']
-
-df.to_csv(output+out_file_name)
+ans = df.reset_index(drop=True)
+ans.to_csv(output+"train.csv")
