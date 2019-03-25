@@ -20,6 +20,10 @@ train_in["time"] = train_in["time"].apply(lambda x: x.split(" ")[1])
 train_out["date"] = train_out["time"].apply(lambda x: int(x.split(" ")[0][8:]))
 train_out["time"] = train_out["time"].apply(lambda x: x.split(" ")[1])
 
+#筛选非休息日
+workday = [2,3,4,7,8,9,10,11,14,15,16,17,18,21,22,23,24,25,28]
+train_in = train_in[train_in["date"].isin(workday)]
+train_out = train_out[train_out["date"].isin(workday)]
 time_list = train_in["time"].unique()
 
 def station_plot(station):
@@ -41,9 +45,9 @@ def station_plot(station):
         # temp_in["inNums"].plot.line(color='b', legend="in",title=str(station) + " station->" + time)
         # temp_out["outNums"].plot.line(color='r', legend="out")
         # plt.show()
-    plt.savefig("F:/数据集处理/1903地铁预测/fig/{}.jpg".format(str(station)))
+    plt.savefig("F:/数据集处理/1903地铁预测/fig_work/{}.jpg".format(str(station)))
 
-files = os.listdir("F:/数据集处理/1903地铁预测/fig")
+files = os.listdir("F:/数据集处理/1903地铁预测/fig_work")
 for i in train_in["stationID"].unique():
     if str(i)+".jpg" not in files:
         print(i)

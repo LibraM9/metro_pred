@@ -74,3 +74,12 @@ submition=sub29[['stationID','startTime','endTime','in29','out29']]
 submition=submition.rename(columns = {'inNums':'in29'})
 submition=submition.rename(columns = {'outNums':'out29'})
 submition.to_csv('F:/数据集处理/1903地铁预测/submit/sub098',index=False)
+
+#############
+x = sub29[["stationID","startTime"]].reset_index(drop=True)
+x["startTime"] = x["startTime"].apply(lambda x:x[:9]+"8"+x[10:])
+y = t28[["stationID","time"]].sort_values(by=["stationID","time"]).reset_index(drop=True)
+for i in range(x.shape[0]):
+    if x["startTime"][i]!=y["time"][i]:
+        print(i,x["startTime"][i],x["stationID"])
+        break
