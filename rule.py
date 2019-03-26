@@ -66,14 +66,23 @@ sub29=sub29.merge(t21_25_in_out_bili,on = ['stationID', 'hours', 'minutes'],how 
 sub29=sub29.merge(t_28,on = ['stationID', 'hours', 'minutes'],how = 'left')
 sub29=sub29.fillna(0)
 
-sub29['in29']=sub29['in_bili']*sub29['in28_mean_hour']*0.98 #每分钟占每小时比例*小时平均值
-sub29['out29']=sub29['out_bili']*sub29['out28_mean_hour']*0.98
+#模型预测的每小时出入人数
+hour_pre29 = pd.read_csv(open("F:/数据集处理/1903地铁预测/train/hour_pre29.csv",encoding="utf8"))
+hour_pre29.columns=["stationID","hours","in_hour_pre","out_hour_pre"]
+sub29 = sub29.merge(hour_pre29,on=["stationID","hours"],how="left")
+sub29["in_hour_pre"] = sub29["in_hour_pre"]/6
+sub29["out_hour_pre"] = sub29["out_hour_pre"]/6
+
+# sub29['in29']=sub29['in_bili']*sub29['in28_mean_hour'] #每分钟占每小时比例*小时平均值
+# sub29['out29']=sub29['out_bili']*sub29['out28_mean_hour']
+sub29['in29']=sub29['in_bili']*sub29['in_hour_pre'] #每分钟占每小时比例*小时平均值
+sub29['out29']=sub29['out_bili']*sub29['out_hour_pre']
 #x=sub29[sub29['inNums'].isnull()]
 #x=x[x['stationID']!=54]
 submition=sub29[['stationID','startTime','endTime','in29','out29']]
 submition=submition.rename(columns = {'inNums':'in29'})
 submition=submition.rename(columns = {'outNums':'out29'})
-submition.to_csv('F:/数据集处理/1903地铁预测/submit/sub098',index=False)
+submition.to_csv('F:/数据集处理/1903地铁预测/submit/sub_lgb_bili.csv',index=False)
 
 #############
 x = sub29[["stationID","startTime"]].reset_index(drop=True)

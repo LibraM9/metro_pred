@@ -46,10 +46,10 @@ def station_plot(station):
         # temp_in["inNums"].plot.line(color='b', legend="in",title=str(station) + " station->" + time)
         # temp_out["outNums"].plot.line(color='r', legend="out")
         # plt.show()
-    plt.savefig("F:/数据集处理/1903地铁预测/fig_work_hour/{}.jpg".format(str(station)))
+    plt.savefig("F:/数据集处理/1903地铁预测/fig_work_hour/{}.png".format(str(station)))
 
 files = os.listdir("F:/数据集处理/1903地铁预测/fig_work_hour")
 for i in train_in["stationID"].unique():
-    if str(i)+".jpg" not in files:
+    if str(i)+".png" not in files:
         print(i)
         station_plot(i)
