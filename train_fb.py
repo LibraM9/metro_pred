@@ -70,5 +70,6 @@ for station in range(81):
         forecast =model.predict(pd.DataFrame({"ds":[29]}))
         test.loc[(test["stationID"]==station)&(test["hour"]==hour),"outNums"]=forecast["trend"].values[0]
 
-
+test["inNums"] = test["inNums"].apply(lambda x:x if x>=0 else 0)
+test["outNums"] = test["outNums"].apply(lambda x:x if x>=0 else 0)
 test[["stationID","hour","inNums","outNums"]].to_csv("F:/数据集处理/1903地铁预测/train/fb_hour_pre29.csv",index=False)
