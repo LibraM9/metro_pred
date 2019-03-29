@@ -1,9 +1,9 @@
 # -*- coding: utf-8 -*-
 # @Author: limeng
-# @File  : train_lgb_min.py
-# @time  : 2019/3/27
+# @File  : train_lgb_min_split.py
+# @time  : 2019/3/28
 """
-文件说明：按分钟训练
+文件说明：对高峰期建模，其余时间段使用28日情况，火车站单独处理
 """
 import lightgbm as lgb
 import pandas as pd
@@ -177,23 +177,30 @@ data_min_all_temp["is_run"] = data_min_all_temp.apply(is_run, axis=1)
 del data_min_all_temp["start_time"],data_min_all_temp["start_time2"]
 del data_min_all_temp["end_time"],data_min_all_temp["end_time2"]
 data_min_all = data_min_all_temp
+
 #去除前5天数据
 data_min_all = data_min_all[(data_min_all.day != 2) & (data_min_all.day != 3) & (data_min_all.day != 4)
                 & (data_min_all.day != 7)& (data_min_all.day != 8)]
 all_columns = [f for f in data_min_all.columns if f not in ['weekend','inNums','outNums'
     , "nuni_deviceID_of_stationID", "nuni_deviceID_of_stationID_hour"]]
 
+#去除特殊站数据
+data_min_all = data_min_all[data_min_all["stationID"].isin([7,15,54]).apply(lambda x:bool(1-x))]
+
+#高峰时间建模
+data_min_all_high = data_min_all[data_min_all.hour.isin([7,8,9,17,18])]
+
 ### all data
-all_data = data_min_all[data_min_all.day!=29]
+all_data = data_min_all_high[data_min_all_high.day!=29]
 X_data = all_data[all_columns].values
 
-train = data_min_all[data_min_all.day <28]
+train = data_min_all_high[data_min_all_high.day <28]
 X_train = train[all_columns].values
 
-valid = data_min_all[data_min_all.day==28]
+valid = data_min_all_high[data_min_all_high.day==28]
 X_valid = valid[all_columns].values
 
-test  = data_min_all[data_min_all.day==29]
+test  = data_min_all_high[data_min_all_high.day==29]
 X_test = test[all_columns].values
 
 #构建模型并训练
@@ -201,8 +208,8 @@ params = {
     'boosting_type': 'gbdt',
     'objective': 'regression',
     'metric': 'mae',
-    'max_depth':5,
-    'num_leaves': 30,
+    'max_depth':8,
+    'num_leaves': 100,
     'learning_rate': 0.01,
     'feature_fraction': 0.7,
     'bagging_fraction': 0.7,
@@ -210,8 +217,8 @@ params = {
     'bagging_freq': 1,
     'verbose': 1,
     # "min_data_in_leaf": 1,
-    'reg_alpha':1,
-    'reg_lambda':2
+    # 'reg_alpha':1,
+    # 'reg_lambda':2
 
 }
 
@@ -225,7 +232,7 @@ gbm = lgb.train(params,
                 num_boost_round=8000,
                 valid_sets=[lgb_train,lgb_evals],
                 valid_names=['train','valid'],
-                early_stopping_rounds=50,
+                early_stopping_rounds=100,
                 verbose_eval=1000,
                 )
 
@@ -268,14 +275,3 @@ test['outNums'] = gbm.predict(X_test)
 
 test["inNums"] = test["inNums"].apply(lambda x:x if x>=0 else 0)
 test["outNums"] = test["outNums"].apply(lambda x:x if x>=0 else 0)
-
-sub29=pd.read_csv(open('F:/数据集/1903地铁预测/Metro_testA/testA_submit_2019-01-29.csv',encoding='utf8'))
-del sub29['inNums']
-del sub29['outNums']
-sub29['hour']=pd.to_datetime(sub29['startTime'],format='%Y-%m-%d %H:%M:%S').dt.hour
-sub29['minute']=pd.to_datetime(sub29['startTime'],format='%Y-%m-%d %H:%M:%S').dt.minute
-sub29=sub29.merge(test[["stationID","hour","minute","inNums","outNums"]],on = ['stationID', 'hour', 'minute'],how = 'left')
-submition=sub29[['stationID','startTime','endTime','inNums','outNums']]
-submition.loc[submition["stationID"]==54,"inNums"]=0
-submition.loc[submition["stationID"]==54,"outNums"]=0
-submition.to_csv('F:/数据集处理/1903地铁预测/submit/lgb_min_pre29_0328.csv',index=False)

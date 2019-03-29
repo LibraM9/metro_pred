@@ -64,25 +64,22 @@ for i in range(0, len(data_list)):
         continue
 
 # 剔除周末,并修改为连续时间
-data1 = data.copy()
-data = data[(data.day!=1)]
 data = data[(data.day!=5)&(data.day!=6)]
 data = data[(data.day!=12)&(data.day!=13)]
 data = data[(data.day!=19)&(data.day!=20)]
 data = data[(data.day!=26)&(data.day!=27)]
 
 def fix_day(d):
-    if d in [2,3,4]:
-        return d - 1
+    if d in [1,2,3,4]:
+        return d
     elif d in [7,8,9,10,11]:
-        return d - 3
+        return d - 2
     elif d in [14,15,16,17,18]:
-        return d - 5
+        return d - 4
     elif d in [21,22,23,24,25]:
-        return d - 7
+        return d - 6
     elif d in [28]:
-        return d - 9
-
+        return d - 8
 data['day'] = data['day'].apply(fix_day)
 
 #拼接测试集
@@ -99,7 +96,7 @@ stat_columns = ['inNums','outNums']
 
 #提取前一天的记录作为特征 todo 使用其他方法提取前一天数据
 def get_refer_day(d):
-    if d == 19:
+    if d == 20:
         return 29
     else:
         return d + 1
@@ -149,30 +146,56 @@ data = data.merge(tmp, on=['stationID','week','hour'], how='left')
 
 #恢复初始时间
 def recover_day(d):
-    if d in [1,2,3]:
-        return d+1
-    elif d in [4,5,6,7,8]:
-        return d + 3
-    elif d in [9,10,11,12,13]:
-        return d + 5
-    elif d in [14,15,16,17,18]:
-        return d + 7
-    elif d == 19:
-        return d + 9
+    if d in [1,2,3,4]:
+        return d
+    elif d in [5,6,7,8,9]:
+        return d + 2
+    elif d in [10,11,12,13,14]:
+        return d + 4
+    elif d in [15,16,17,18,19]:
+        return d + 6
+    elif d == 20:
+        return d + 8
     else:
         return d
 
+#加入外部数据
+station_detail = pd.read_excel("F:/代码空间/1903地铁预测/station_id.xlsx")
+data_min_all_temp = data.merge(station_detail,on="stationID",how="left")
+def is_run(df):
+    hour = str(int(df["hour"]))
+    if len(hour)==1:
+        hour = "0"+hour
+    minute = str(int(df["minute"]))
+    if len(minute)==1:
+        minute = "0"+minute
+    temp_time = hour+":"+minute
+    if len(temp_time)==4:
+        temp_time = "0"+temp_time
+    if (temp_time<min(df["start_time"],df["start_time2"])) | (temp_time>max(df["end_time"],df["end_time2"])):
+        return 0
+    else:
+        return 1
+data_min_all_temp["is_run"] = data_min_all_temp.apply(is_run, axis=1)
+del data_min_all_temp["start_time"],data_min_all_temp["start_time2"]
+del data_min_all_temp["end_time"],data_min_all_temp["end_time2"]
+data = data_min_all_temp
+#去除特殊站
+data = data[data["stationID"].isin([7,15,54]).apply(lambda x:bool(1-x))]
+#变量筛选
 all_columns = [f for f in data.columns if f not in ['weekend','inNums','outNums']]
 ### all data
 all_data = data[data.day!=29]
 all_data['day'] = all_data['day'].apply(recover_day)
+all_data = all_data[all_data.day!=1] #去除第一天
 X_data = all_data[all_columns].values
 
-train = data[data.day <19]
+train = data[data.day <20]
 train['day'] = train['day'].apply(recover_day)
+train = train[train.day!=1] #去除第一天
 X_train = train[all_columns].values
 
-valid = data[data.day==19]
+valid = data[data.day==20]
 valid['day'] = valid['day'].apply(recover_day)
 X_valid = valid[all_columns].values
 
@@ -246,10 +269,24 @@ gbm = lgb.train(params,
                 )
 test['outNums'] = gbm.predict(X_test)
 
+test["inNums"] = test["inNums"].apply(lambda x:x if x>=0 else 0)
+test["outNums"] = test["outNums"].apply(lambda x:x if x>=0 else 0)
+
+#修复7，15，54
+rule = pd.read_csv('F:/数据集处理/1903地铁预测/submit/sub_rulebili_lgbmin_stack.csv')
+rule['hour']=pd.to_datetime(rule['startTime'],format='%Y-%m-%d %H:%M:%S').dt.hour
+rule['minute']=pd.to_datetime(rule['startTime'],format='%Y-%m-%d %H:%M:%S').dt.minute
+test = test[["stationID","hour","minute","inNums","outNums"]]
+test = pd.concat([test,rule.loc[rule["stationID"].isin([7,15,54]),["stationID","hour","minute","inNums","outNums"]]],axis=0)
+#导出结果
 sub = pd.read_csv(open(path + '/Metro_testA/testA_submit_2019-01-29.csv',encoding="utf8"))
-sub['inNums']   = test['inNums'].values
-sub['outNums']  = test['outNums'].values
-# 结果修正
-sub.loc[sub.inNums<0 , 'inNums']  = 0
-sub.loc[sub.outNums<0, 'outNums'] = 0
-sub[['stationID', 'startTime', 'endTime', 'inNums', 'outNums']].to_csv('output/sub_model.csv', index=False)
+del sub['inNums']
+del sub['outNums']
+sub['hour']=pd.to_datetime(sub['startTime'],format='%Y-%m-%d %H:%M:%S').dt.hour
+sub['minute']=pd.to_datetime(sub['startTime'],format='%Y-%m-%d %H:%M:%S').dt.minute
+sub=sub.merge(test,on = ['stationID', 'hour', 'minute'],how = 'left')
+submition=sub[['stationID','startTime','endTime','inNums','outNums']]
+submition.loc[submition["stationID"]==54,"inNums"]=0
+submition.loc[submition["stationID"]==54,"outNums"]=0
+
+submition[['stationID', 'startTime', 'endTime', 'inNums', 'outNums']].to_csv('F:/数据集处理/1903地铁预测/submit/lgb_min_yu_pro.csv',index=False)

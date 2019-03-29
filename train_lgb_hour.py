@@ -143,22 +143,46 @@ tmp = data_hour.groupby(['stationID','week','hour'], as_index=False)['outNums'].
                                                                         })
 data_hour_all = data_hour_all.merge(tmp, on=['stationID','week','hour'], how='left')
 data_hour_all = data_hour_all.fillna(0)
-#去除前3天数据
-data_hour_all = data_hour_all[(data_hour_all.day!=2)&(data_hour_all.day!=3)&(data_hour_all.day!=4)]
+
+#地铁运营外部数据
+station_detail = pd.read_excel("F:/代码空间/1903地铁预测/station_id.xlsx")
+data_min_all_temp = data_hour_all.merge(station_detail,on="stationID",how="left")
+def is_run(df):
+    hour = str(int(df["hour"]))
+    if len(hour)==1:
+        hour = "0"+hour
+    minute = "00"
+    temp_time = hour+":"+minute
+    if len(temp_time)==4:
+        temp_time = "0"+temp_time
+    if (temp_time<min(df["start_time"],df["start_time2"])) | (temp_time>max(df["end_time"],df["end_time2"])):
+        return 0
+    else:
+        return 1
+data_min_all_temp["is_run"] = data_min_all_temp.apply(is_run, axis=1)
+del data_min_all_temp["start_time"],data_min_all_temp["start_time2"]
+del data_min_all_temp["end_time"],data_min_all_temp["end_time2"]
+data_hour_all = data_min_all_temp
+#去除前5天数据
+data_hour_all = data_hour_all[(data_hour_all.day!=2)&(data_hour_all.day!=3)&(data_hour_all.day!=4)
+        &(data_hour_all.day!=7)&(data_hour_all.day!=8)]
 all_columns = [f for f in data_hour_all.columns if f not in ['weekend','inNums','outNums'
     ,"nuni_deviceID_of_stationID","nuni_deviceID_of_stationID_hour"]]
 
+#去除特殊站
+data_hour_all_station = data_hour_all[data_hour_all["stationID"].isin([7,15,54]).apply(lambda x:bool(1-x))]
+# data_hour_all_station = data_hour_all.copy()
 # all data
-all_data = data_hour_all[data_hour_all.day!=29]
+all_data = data_hour_all_station[data_hour_all_station.day!=29]
 X_data = all_data[all_columns]
 
-train = data_hour_all[data_hour_all.day <28]
+train = data_hour_all_station[data_hour_all_station.day <28]
 X_train = train[all_columns]
 
-valid = data_hour_all[data_hour_all.day==28]
+valid = data_hour_all_station[data_hour_all_station.day==28]
 X_valid = valid[all_columns]
 
-test  = data_hour_all[data_hour_all.day==29]
+test  = data_hour_all_station[data_hour_all_station.day==29]
 X_test = test[all_columns]
 
 #构建模型并训练
@@ -166,10 +190,11 @@ params = {
     'boosting_type': 'gbdt',
     'objective': 'regression',
     'metric': 'mae',
+    'max_depth':8,
     'num_leaves': 63,
     'learning_rate': 0.01,
-    'feature_fraction': 0.9,
-    'bagging_fraction': 0.9,
+    'feature_fraction': 0.8,
+    'bagging_fraction': 0.8,
     'bagging_seed':0,
     'bagging_freq': 1,
     'verbose': 1,
@@ -184,10 +209,10 @@ lgb_train = lgb.Dataset(X_train, y_train)
 lgb_evals = lgb.Dataset(X_valid, y_valid , reference=lgb_train)
 gbm = lgb.train(params,
                 lgb_train,
-                num_boost_round=20000,
+                num_boost_round=10000,
                 valid_sets=[lgb_train,lgb_evals],
                 valid_names=['train','valid'],
-                early_stopping_rounds=200,
+                early_stopping_rounds=50,
                 verbose_eval=1000,
                 )
 
@@ -230,4 +255,8 @@ test['outNums'] = gbm.predict(X_test)
 
 test["inNums"] = test["inNums"].apply(lambda x:x if x>=0 else 0)
 test["outNums"] = test["outNums"].apply(lambda x:x if x>=0 else 0)
-test[["stationID","hour","inNums","outNums"]].to_csv("F:/数据集处理/1903地铁预测/train/lgb_hour_pre29_0327.csv",index=False)
+
+data_hour_all_split = data_hour_all[data_hour_all["stationID"].isin([7,15,54])]
+test_split  = data_hour_all_split[data_hour_all_split.day==29]
+test = pd.concat([test,test_split],axis=0)
+test[["stationID","hour","inNums","outNums"]].to_csv("F:/数据集处理/1903地铁预测/train/lgb_hour_pre29_0328.csv",index=False)
