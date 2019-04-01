@@ -67,37 +67,37 @@ sub29=sub29.merge(t_28,on = ['stationID', 'hours', 'minutes'],how = 'left')
 sub29=sub29.fillna(0)
 
 #lgb预测的每小时出入人数
-lgb_hour_pre29 = pd.read_csv(open("F:/数据集处理/1903地铁预测/train/lgb_hour_pre29_0328.csv",encoding="utf8"))
-lgb_hour_pre29.columns=["stationID","hours","in_hour_pre_lgb","out_hour_pre_lgb"]
-sub29 = sub29.merge(lgb_hour_pre29,on=["stationID","hours"],how="left")
-sub29["in_hour_pre_lgb"] = sub29["in_hour_pre_lgb"]/6
-sub29["out_hour_pre_lgb"] = sub29["out_hour_pre_lgb"]/6
-
-#fbprophet预测的每小时人数
-fb_hour_pre29 = pd.read_csv(open("F:/数据集处理/1903地铁预测/train/fb_hour_pre29.csv",encoding="utf8"))
-fb_hour_pre29.columns=["stationID","hours","in_hour_pre_fb","out_hour_pre_fb"]
-sub29 = sub29.merge(fb_hour_pre29,on=["stationID","hours"],how="left")
-sub29["in_hour_pre_fb"] = sub29["in_hour_pre_fb"]/6
-sub29["out_hour_pre_fb"] = sub29["out_hour_pre_fb"]/6
+# lgb_hour_pre29 = pd.read_csv(open("F:/数据集处理/1903地铁预测/train/lgb_hour_pre29_0328.csv",encoding="utf8"))
+# lgb_hour_pre29.columns=["stationID","hours","in_hour_pre_lgb","out_hour_pre_lgb"]
+# sub29 = sub29.merge(lgb_hour_pre29,on=["stationID","hours"],how="left")
+# sub29["in_hour_pre_lgb"] = sub29["in_hour_pre_lgb"]/6
+# sub29["out_hour_pre_lgb"] = sub29["out_hour_pre_lgb"]/6
+#
+# #fbprophet预测的每小时人数
+# fb_hour_pre29 = pd.read_csv(open("F:/数据集处理/1903地铁预测/train/fb_hour_pre29.csv",encoding="utf8"))
+# fb_hour_pre29.columns=["stationID","hours","in_hour_pre_fb","out_hour_pre_fb"]
+# sub29 = sub29.merge(fb_hour_pre29,on=["stationID","hours"],how="left")
+# sub29["in_hour_pre_fb"] = sub29["in_hour_pre_fb"]/6
+# sub29["out_hour_pre_fb"] = sub29["out_hour_pre_fb"]/6
 
 sub29['in29_28mean']=sub29['in_bili']*sub29['in28_mean_hour']*0.965 #每分钟占每小时比例*小时平均值
 sub29['out29_28mean']=sub29['out_bili']*sub29['out28_mean_hour']*0.965
-sub29['in29_fb']=sub29['in_bili']*sub29['in_hour_pre_fb'] #每分钟占每小时比例*小时平均值
-sub29['out29_fb']=sub29['out_bili']*sub29['out_hour_pre_fb']
-sub29['in29_lgb']=sub29['in_bili']*sub29['in_hour_pre_lgb'] #每分钟占每小时比例*小时平均值
-sub29['out29_lgb']=sub29['out_bili']*sub29['out_hour_pre_lgb']
-sub29.loc[sub29["stationID"]==7,'in29_lgb'] = sub29.loc[sub29["stationID"]==7,'in29_28mean'].values
-sub29.loc[sub29["stationID"]==7,'out29_lgb'] = sub29.loc[sub29["stationID"]==7,'out29_28mean'].values*1.1
-sub29.loc[sub29["stationID"]==15,'in29_lgb'] = sub29.loc[sub29["stationID"]==7,'in29_28mean'].values
-sub29.loc[sub29["stationID"]==15,'out29_lgb'] = sub29.loc[sub29["stationID"]==7,'out29_28mean'].values*1.05
+# sub29['in29_fb']=sub29['in_bili']*sub29['in_hour_pre_fb'] #每分钟占每小时比例*小时平均值
+# sub29['out29_fb']=sub29['out_bili']*sub29['out_hour_pre_fb']
+# sub29['in29_lgb']=sub29['in_bili']*sub29['in_hour_pre_lgb'] #每分钟占每小时比例*小时平均值
+# sub29['out29_lgb']=sub29['out_bili']*sub29['out_hour_pre_lgb']
+# sub29.loc[sub29["stationID"]==7,'in29_lgb'] = sub29.loc[sub29["stationID"]==7,'in29_28mean'].values
+# sub29.loc[sub29["stationID"]==7,'out29_lgb'] = sub29.loc[sub29["stationID"]==7,'out29_28mean'].values*1.1
+# sub29.loc[sub29["stationID"]==15,'in29_lgb'] = sub29.loc[sub29["stationID"]==7,'in29_28mean'].values
+# sub29.loc[sub29["stationID"]==15,'out29_lgb'] = sub29.loc[sub29["stationID"]==7,'out29_28mean'].values*1.05
 #x=sub29[sub29['inNums'].isnull()]
 #x=x[x['stationID']!=54]
-submition=sub29[['stationID','startTime','endTime','in29_lgb','out29_lgb']]
-submition=submition.rename(columns = {'in29_lgb':'inNums'})
-submition=submition.rename(columns = {'out29_lgb':'outNums'})
-submition.to_csv('F:/数据集处理/1903地铁预测/submit/sub_rule_bili_split.csv',index=False)#特殊站使用规则，非特殊站使用模型
+submition=sub29[['stationID','startTime','endTime','in29_28mean','out29_28mean']]
+submition=submition.rename(columns = {'in29_28mean':'inNums'})
+submition=submition.rename(columns = {'out29_28mean':'outNums'})
+submition.to_csv('F:/数据集处理/1903地铁预测/submit/sub_rule_bili_best.csv',index=False)#特殊站使用规则，非特殊站使用模型
 
-#############stacking
+#############stacking yu和bili
 lgb_yu = pd.read_csv(open("F:/数据集处理/1903地铁预测/submit/lgb_min_yu.csv",encoding="utf8"))
 rule_bili = pd.read_csv(open("F:/数据集处理/1903地铁预测/submit/sub_rule_bili_best.csv",encoding="utf8"))
 submition = lgb_yu.merge(rule_bili,on=['stationID','startTime','endTime'],how="left")
@@ -105,3 +105,12 @@ submition["inNums"] = submition["inNums_x"]*0.5+submition["inNums_y"]*0.5
 submition["outNums"] = submition["outNums_x"]*0.5+submition["outNums_y"]*0.5
 submition=submition[['stationID','startTime','endTime','inNums','outNums']]
 submition.to_csv('F:/数据集处理/1903地铁预测/submit/sub_rulebili_lgbmin_stack.csv',index=False)
+
+##############stacking yu pro 和 bili
+lgb_yu = pd.read_csv(open("F:/数据集处理/1903地铁预测/submit/lgb_min_yu_pro.csv",encoding="utf8"))
+rule_bili = pd.read_csv(open("F:/数据集处理/1903地铁预测/submit/sub_rule_bili_best.csv",encoding="utf8"))
+submition = lgb_yu.merge(rule_bili,on=['stationID','startTime','endTime'],how="left")
+submition["inNums"] = submition["inNums_x"]*0.5+submition["inNums_y"]*0.5
+submition["outNums"] = submition["outNums_x"]*0.5+submition["outNums_y"]*0.5
+submition=submition[['stationID','startTime','endTime','inNums','outNums']]
+submition.to_csv('F:/数据集处理/1903地铁预测/submit/sub_rulebili_lgbmin_stack_pro.csv',index=False)

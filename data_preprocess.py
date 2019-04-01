@@ -10,7 +10,8 @@ import pandas as pd
 import os
 
 path = "F:/数据集/1903地铁预测/"
-test = pd.read_csv(open(path + '/Metro_testA/testA_submit_2019-01-29.csv',encoding="utf8"))
+test = pd.read_csv(open(path + '/Metro_testB/testB_submit_2019-01-27.csv',encoding="utf8"))
+test_26 = pd.read_csv(open(path + '/Metro_testB/testB_record_2019-01-26.csv',encoding="utf8"))
 test_28 = pd.read_csv(open(path + '/Metro_testA/testA_record_2019-01-28.csv',encoding="utf8"))
 
 def get_base_features(df_):
@@ -47,8 +48,9 @@ def get_base_features(df_):
 
     return result
 
-data = get_base_features(test_28)
-
+data_28 = get_base_features(test_28)
+data_26 = get_base_features(test_26)
+data = pd.concat([data_28, data_26], axis=0, ignore_index=True)
 #加载所有文件
 data_list = os.listdir(path+'/Metro_train/')
 for i in range(0, len(data_list)):
@@ -72,4 +74,45 @@ def get_test_features(test):
 
 test = get_test_features(test)
 data = pd.concat([data,test], axis=0, ignore_index=True)
-data.to_csv("F:/数据集处理/1903地铁预测/train/data_all.csv",index=False)
+############################################################
+#构造全部枚举值
+temp_df = pd.DataFrame({"minute":[],"hour":[],"day":[],"stationID":[]})
+for station in range(81):
+    print(station)
+    for day in range(1,29):
+        for hour in range(24):
+            temp = pd.DataFrame({"minute":[0,10,20,30,40,50]})
+            temp["hour"] = int(hour)
+            temp["day"] = int(day)
+            temp["stationID"] = int(station)
+            temp_df = pd.concat([temp_df,temp],axis=0)
+temp_df = temp_df.reset_index(drop=True)
+data_min_all = temp_df.merge(data, on=["stationID", "day", "hour", "minute"], how="left")
+data_min_all = data_min_all.fillna(0)
+
+#week填充
+def week_fill(df):
+    if df["day"] in [7,14,21,28]:
+        df["week"]=1
+        df["weekend"] = 0
+    elif df["day"] in [1,8,15,22,29]:
+        df["week"]=2
+        df["weekend"] = 0
+    elif df["day"] in [2,9,16,23,30]:
+        df["week"] = 3
+        df["weekend"] = 0
+    elif df["day"] in [3,10,17,24,31]:
+        df["week"] = 4
+        df["weekend"] = 0
+    elif df["day"] in [4,11,18,25]:
+        df["week"] = 5
+        df["weekend"] = 0
+    elif df["day"] in [5,12,19,26]:
+        df["week"] = 6
+        df["weekend"] = 1
+    elif df["day"] in [6,13,20,27]:
+        df["week"] = 7
+        df["weekend"] = 1
+    return df
+data_min_all = data_min_all.apply(week_fill, axis=1)
+data_min_all.to_csv("F:/数据集处理/1903地铁预测/train/data_all_b.csv",index=False)

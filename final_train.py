@@ -1,111 +1,45 @@
 # -*- coding: utf-8 -*-
 #@author: limeng
-#@file: train_yu.py
-#@time: 2019/3/29 23:07
+#@file: final_train.py
+#@time: 2019/3/30 22:55
 """
-文件说明：预处理
-https://zhuanlan.zhihu.com/p/59998657
-13.7446
+文件说明：
 """
 import pandas as pd
 import os
 import numpy as np
 import lightgbm as lgb
 
-path = "F:/数据集/1903地铁预测/"
-# # test = pd.read_csv(open(path + '/Metro_testA/testA_submit_2019-01-29.csv',encoding="utf8"))
-# # test_28 = pd.read_csv(open(path + '/Metro_testA/testA_record_2019-01-28.csv',encoding="utf8"))
-# test = pd.read_csv(open(path + '/Metro_testB/testb_submit_2019-01-27.csv',encoding="utf8"))
-# test_26 = pd.read_csv(open(path + '/Metro_testB/testB_record_2019-01-26.csv',encoding="utf8"))
-# test_28 = pd.read_csv(open(path + '/Metro_testA/testA_record_2019-01-28.csv',encoding="utf8"))
-#
-# def get_base_features(df_):
-#     df = df_.copy()
-#
-#     # base time
-#     df['day'] = df['time'].apply(lambda x: int(x[8:10]))
-#     df['week'] = pd.to_datetime(df['time']).dt.dayofweek + 1
-#     df['weekend'] = (pd.to_datetime(df.time).dt.weekday >= 5).astype(int)
-#     df['hour'] = df['time'].apply(lambda x: int(x[11:13]))
-#     df['minute'] = df['time'].apply(lambda x: int(x[14:15] + '0'))
-#
-#     # count,sum
-#     result = df.groupby(['stationID', 'week', 'weekend', 'day', 'hour', 'minute']).status.agg(
-#         ['count', 'sum']).reset_index()
-#
-#     # nunique
-#     tmp = df.groupby(['stationID'])['deviceID'].nunique().reset_index(name='nuni_deviceID_of_stationID')
-#     result = result.merge(tmp, on=['stationID'], how='left')
-#     tmp = df.groupby(['stationID', 'hour'])['deviceID'].nunique().reset_index(name='nuni_deviceID_of_stationID_hour')
-#     result = result.merge(tmp, on=['stationID', 'hour'], how='left')
-#     tmp = df.groupby(['stationID', 'hour', 'minute'])['deviceID'].nunique(). \
-#         reset_index(name='nuni_deviceID_of_stationID_hour_minute')
-#     result = result.merge(tmp, on=['stationID', 'hour', 'minute'], how='left')
-#
-#     # in,out
-#     result['inNums'] = result['sum']
-#     result['outNums'] = result['count'] - result['sum']
-#
-#     #
-#     result['day_since_first'] = result['day'] - 1
-#     result.fillna(0, inplace=True)
-#     del result['sum'], result['count']
-#
-#     return result
-#
-# # data = get_base_features(test_28)
-# data_28 = get_base_features(test_28)
-# data_26 = get_base_features(test_26)
-# data = pd.concat([data_28, data_26], axis=0, ignore_index=True)
-# #加载所有文件
-# data_list = os.listdir(path+'/Metro_train/')
-# for i in range(0, len(data_list)):
-#     if data_list[i].split('.')[-1] == 'csv':
-#         print(data_list[i], i)
-#         df = pd.read_csv(open(path+'/Metro_train/' + data_list[i],encoding="utf8"))
-#         df = get_base_features(df)
-#         data = pd.concat([data, df], axis=0, ignore_index=True)
-#     else:
-#         continue
-
-data = pd.read_csv("F:/数据集处理/1903地铁预测/train/data_all_b.csv")
-# 剔除周末,并修改为连续时间
-data1 = data.copy()
-data = data[(data.day!=1)]
-data = data[(data.day!=5)&(data.day!=6)]
-data = data[(data.day!=12)&(data.day!=13)]
-data = data[(data.day!=19)&(data.day!=20)]
-data = data[(data.day!=26)&(data.day!=27)]
+data = pd.read_csv(open("F:/数据集处理/1903地铁预测/train/data_all_b.csv",encoding="utf8"))
+# 保留周末
+holiday = [5,6,12,13,19,20,26,27]
+data = data[data["day"].isin(holiday)]
 
 def fix_day(d):
-    if d in [1,2,3,4]:
+    if d==5:
+        return 1
+    elif d==6:
+        return 2
+    elif d==12:
+        return 3
+    elif d ==13:
+        return 4
+    elif d ==19:
+        return 5
+    elif d ==20:
+        return 6
+    elif d ==26:
+        return 7
+    else:
         return d
-    elif d in [7,8,9,10,11]:
-        return d - 2
-    elif d in [14,15,16,17,18]:
-        return d - 4
-    elif d in [21,22,23,24,25]:
-        return d - 6
-    elif d in [28]:
-        return d - 8
 data['day'] = data['day'].apply(fix_day)
-
-#拼接测试集
-# test['week']    = pd.to_datetime(test['startTime']).dt.dayofweek + 1
-# test['weekend'] = (pd.to_datetime(test.startTime).dt.weekday >=5).astype(int)
-# test['day']     = test['startTime'].apply(lambda x: int(x[8:10]))
-# test['hour']    = test['startTime'].apply(lambda x: int(x[11:13]))
-# test['minute']  = test['startTime'].apply(lambda x: int(x[14:15]+'0'))
-# test['day_since_first'] = test['day'] - 1
-# test = test.drop(['startTime','endTime'], axis=1)
-# data = pd.concat([data,test], axis=0, ignore_index=True)
 
 stat_columns = ['inNums','outNums']
 
-#提取前一天的记录作为特征 todo 使用其他方法提取前一天数据
+#提取前一天的记录作为特征
 def get_refer_day(d):
-    if d == 20:
-        return 29
+    if d == 7:
+        return 27
     else:
         return d + 1
 
@@ -154,35 +88,39 @@ data = data.merge(tmp, on=['stationID','week','hour'], how='left')
 
 #恢复初始时间
 def recover_day(d):
-    if d in [1,2,3,4]:
-        return d
-    elif d in [5,6,7,8,9]:
-        return d + 2
-    elif d in [10,11,12,13,14]:
-        return d + 4
-    elif d in [15,16,17,18,19]:
-        return d + 6
-    elif d == 20:
-        return d + 8
+    if d==1:
+        return 5
+    elif d==2:
+        return 6
+    elif d==3:
+        return 12
+    elif d ==4:
+        return 13
+    elif d ==5:
+        return 19
+    elif d ==6:
+        return 20
+    elif d ==7:
+        return 26
     else:
         return d
 
 all_columns = [f for f in data.columns if f not in ['weekend','inNums','outNums']]
 ### all data
-all_data = data[data.day!=29]
+all_data = data[data.day!=27]
 all_data['day'] = all_data['day'].apply(recover_day)
-X_data = all_data[all_columns].values
+X_data = all_data[all_columns]
 
-train = data[data.day <20]
+train = data[data.day <7]
 train['day'] = train['day'].apply(recover_day)
-X_train = train[all_columns].values
+X_train = train[all_columns]
 
-valid = data[data.day==20]
+valid = data[data.day==7]
 valid['day'] = valid['day'].apply(recover_day)
-X_valid = valid[all_columns].values
+X_valid = valid[all_columns]
 
-test  = data[data.day==29]
-X_test = test[all_columns].values
+test  = data[data.day==27]
+X_test = test[all_columns]
 
 #构建模型并训练
 params = {
@@ -251,10 +189,13 @@ gbm = lgb.train(params,
                 )
 test['outNums'] = gbm.predict(X_test)
 
-sub = pd.read_csv(open(path + '/Metro_testA/testA_submit_2019-01-29.csv',encoding="utf8"))
-sub['inNums']   = test['inNums'].values
-sub['outNums']  = test['outNums'].values
-# 结果修正
-sub.loc[sub.inNums<0 , 'inNums']  = 0
-sub.loc[sub.outNums<0, 'outNums'] = 0
-sub[['stationID', 'startTime', 'endTime', 'inNums', 'outNums']].to_csv('F:/数据集处理/1903地铁预测/submit/lgb_min_yu.csv', index=False)
+sub27 = pd.read_csv(open('F:/数据集/1903地铁预测/Metro_testB/testB_submit_2019-01-27.csv', encoding="utf8"))
+del sub27['inNums']
+del sub27['outNums']
+sub27['hour']=pd.to_datetime(sub27['startTime'], format='%Y-%m-%d %H:%M:%S').dt.hour
+sub27['minute']=pd.to_datetime(sub27['startTime'], format='%Y-%m-%d %H:%M:%S').dt.minute
+sub27=sub27.merge(test[["stationID", "hour", "minute", "inNums", "outNums"]], on = ['stationID', 'hour', 'minute'], how ='left')
+submition=sub27[['stationID', 'startTime', 'endTime', 'inNums', 'outNums']]
+submition.loc[submition["stationID"]==54,"inNums"]=0
+submition.loc[submition["stationID"]==54,"outNums"]=0
+submition.to_csv('F:/数据集处理/1903地铁预测/submit/final_sub/sub2_lgb_67.csv',index=False)
